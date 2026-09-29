@@ -35,10 +35,10 @@ export const PublicResumeView: React.FC<{ onOpenShare: () => void }> = ({ onOpen
 
           <div>
             <h1 className="text-sm font-bold text-white leading-tight">
-              {currentResume.personal.fullName}
+              {currentResume.personal.fullName || currentResume.name || 'Live Resume'}
             </h1>
             <p className="text-[11px] text-slate-400 font-mono">
-              resumeforge.app/r/{currentResume.personal.fullName.toLowerCase().replace(/[^a-z0-9]/g, '-')}
+              {(typeof window !== 'undefined' ? window.location.host : 'resumeats-three.vercel.app')}/?view=publicView&r={(currentResume.personal.fullName || 'resume').toLowerCase().trim().replace(/[^a-z0-9]+/g, '-')}
             </p>
           </div>
         </div>

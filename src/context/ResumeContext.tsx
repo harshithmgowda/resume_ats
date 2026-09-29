@@ -109,14 +109,46 @@ try {
 const ResumeContext = createContext<ResumeContextType | null>(null);
 
 export const ResumeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Always start with 1 completely clean, blank resume (in-memory only, no user storage)
-  const [resumes, setResumes] = useState<ResumeData[]>([initialResumeData]);
-  const [activeResumeId, setActiveResumeId] = useState<string>(initialResumeData.id);
+  // Check URL parameters for view=publicView or shared resume session
+  const initialSetup = useMemo(() => {
+    let initialResumes = [initialResumeData];
+    let initialActiveId = initialResumeData.id;
+    let initialView: ActiveView = 'dashboard';
+
+    if (typeof window !== 'undefined') {
+      const searchParams = new URLSearchParams(window.location.search);
+      const viewParam = searchParams.get('view');
+      const hash = window.location.hash || '';
+
+      if (viewParam === 'publicView' || hash.includes('public') || hash.includes('r=')) {
+        initialView = 'publicView';
+      }
+
+      // Check if there is an active session resume (for same-browser preview/sharing)
+      try {
+        const sessionData = sessionStorage.getItem('resumeforge_active_share');
+        if (sessionData) {
+          const parsed = JSON.parse(sessionData);
+          if (parsed && parsed.personal) {
+            initialResumes = [parsed];
+            initialActiveId = parsed.id || initialResumeData.id;
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    return { initialResumes, initialActiveId, initialView };
+  }, []);
+
+  const [resumes, setResumes] = useState<ResumeData[]>(initialSetup.initialResumes);
+  const [activeResumeId, setActiveResumeId] = useState<string>(initialSetup.initialActiveId);
   const [designConfig, setDesignConfig] = useState<DesignConfig>(initialDesignConfig);
   const [animationConfig, setAnimationConfig] = useState<AnimationConfig>(initialAnimationConfig);
   const [favorites, setFavorites] = useState<string[]>(['modern-blue', 'developer-dark', 'ats-simple']);
 
-  const [activeView, setActiveView] = useState<ActiveView>('dashboard');
+  const [activeView, setActiveView] = useState<ActiveView>(initialSetup.initialView);
   const [autosaveStatus, setAutosaveStatus] = useState<'saved' | 'saving'>('saved');
   const [zoomLevel, setZoomLevel] = useState<number>(100);
   const [previewAnimationKey, setPreviewAnimationKey] = useState<number>(0);
@@ -125,6 +157,17 @@ export const ResumeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const currentResume = useMemo(() => {
     return resumes.find((r) => r.id === activeResumeId) || resumes[0] || initialResumeData;
   }, [resumes, activeResumeId]);
+
+  // Keep session storage in sync with current resume for live preview / share
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      try {
+        sessionStorage.setItem('resumeforge_active_share', JSON.stringify(currentResume));
+      } catch (e) {
+        // ignore
+      }
+    }
+  }, [currentResume]);
 
   // Debounced in-memory sync notice (no persistent storage of user data)
   useEffect(() => {

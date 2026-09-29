@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Copy, Check, ExternalLink, Globe, Lock, Share2, QrCode } from 'lucide-react';
 import { useResume } from '../../context/ResumeContext';
 
@@ -10,12 +10,33 @@ export const ShareModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
   const [copied, setCopied] = useState(false);
   const [isPublic, setIsPublic] = useState(true);
 
+  // Sync current active resume to session storage for seamless cross-tab / preview viewing
+  useEffect(() => {
+    if (isOpen && typeof window !== 'undefined' && window.sessionStorage) {
+      try {
+        sessionStorage.setItem('resumeforge_active_share', JSON.stringify(currentResume));
+      } catch (e) {
+        // ignore
+      }
+    }
+  }, [isOpen, currentResume]);
+
   if (!isOpen) return null;
 
-  const slug = (currentResume.personal.fullName || 'user')
+  // Dynamically resolve actual origin (e.g. https://resumeats-three.vercel.app or localhost in dev)
+  const origin =
+    typeof window !== 'undefined' && window.location.origin
+      ? window.location.origin
+      : 'https://resumeats-three.vercel.app';
+
+  const slug = (currentResume.personal.fullName || 'resume')
     .toLowerCase()
-    .replace(/[^a-z0-9]/g, '-');
-  const shareUrl = `https://resumeforge.app/r/${slug}`;
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'resume';
+
+  const shareUrl = `${origin}/?view=publicView&r=${slug}`;
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(shareUrl)}`;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(shareUrl);
@@ -24,6 +45,13 @@ export const ShareModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
   };
 
   const handleOpenPublicView = () => {
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      try {
+        sessionStorage.setItem('resumeforge_active_share', JSON.stringify(currentResume));
+      } catch (e) {
+        // ignore
+      }
+    }
     onClose();
     setActiveView('publicView');
   };
@@ -100,25 +128,42 @@ export const ShareModal: React.FC<{ isOpen: boolean; onClose: () => void }> = ({
             </div>
           </div>
 
-          {/* QR Code Preview */}
+          {/* Real Scannable QR Code */}
           <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-center gap-4">
-            <div className="w-16 h-16 bg-white p-2 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-center shrink-0">
-              <QrCode className="w-12 h-12 text-slate-800" />
+            <div className="w-16 h-16 bg-white p-1 rounded-xl border border-slate-200 shadow-2xs flex items-center justify-center shrink-0 overflow-hidden">
+              <img
+                src={qrCodeUrl}
+                alt="Scannable QR Code"
+                className="w-14 h-14 object-contain rounded"
+              />
             </div>
             <div className="text-xs text-slate-600">
               <span className="font-bold text-slate-900 block mb-0.5">Scannable QR Code</span>
-              Recruiters can instantly scan this from your phone screen or printed portfolio.
+              Recruiters can instantly scan this with their phone camera to view your live resume.
             </div>
           </div>
 
-          {/* View Live Page Action */}
-          <button
-            onClick={handleOpenPublicView}
-            className="w-full py-2.5 rounded-xl border border-blue-200 text-blue-700 hover:bg-blue-50 text-xs font-semibold flex items-center justify-center gap-2 transition-colors"
-          >
-            <span>Preview Public Resume Webpage</span>
-            <ExternalLink className="w-3.5 h-3.5" />
-          </button>
+          {/* View Live Page Actions */}
+          <div className="flex gap-2">
+            <button
+              onClick={handleOpenPublicView}
+              className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors shadow-xs"
+            >
+              <span>Preview Public Resume Webpage</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </button>
+            <a
+              href={shareUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={onClose}
+              className="px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+              title="Open in new browser tab"
+            >
+              <span>New Tab</span>
+              <ExternalLink className="w-3.5 h-3.5 text-slate-500" />
+            </a>
+          </div>
         </div>
       </div>
     </div>

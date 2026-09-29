@@ -116,7 +116,9 @@ export const LandingPage: React.FC = () => {
               <span className="w-3 h-3 rounded-full bg-rose-400" />
               <span className="w-3 h-3 rounded-full bg-amber-400" />
               <span className="w-3 h-3 rounded-full bg-emerald-400" />
-              <span className="ml-2 font-mono text-[11px]">resumeforge.app/preview</span>
+              <span className="ml-2 font-mono text-[11px]">
+                {typeof window !== 'undefined' ? window.location.host : 'resumeats-three.vercel.app'}/preview
+              </span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-blue-700 font-bold flex items-center gap-1">

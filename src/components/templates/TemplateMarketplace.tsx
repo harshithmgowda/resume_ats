@@ -3,7 +3,6 @@ import {
   Search,
   Filter,
   Star,
-  Users,
   ShieldCheck,
   Heart,
   Eye,
@@ -271,9 +270,6 @@ export const TemplateMarketplace: React.FC<{
                   </p>
 
                   <div className="flex items-center gap-3 text-[11px] text-slate-500 mt-3">
-                    <span className="flex items-center gap-1">
-                      <Users className="w-3.5 h-3.5 text-slate-400" /> {tpl.usageCount}
-                    </span>
                     {tpl.atsFriendly && (
                       <span className="flex items-center gap-1 text-emerald-700 font-medium">
                         <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" /> ATS Friendly

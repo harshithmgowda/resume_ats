@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Check, Star, Users, ShieldCheck, Sparkles, ArrowRight } from 'lucide-react';
+import { X, Check, Star, ShieldCheck, Sparkles, ArrowRight } from 'lucide-react';
 import { TemplateDefinition } from '../../types/resume';
 import { useResume } from '../../context/ResumeContext';
 import { TemplateRenderer } from '../templates/TemplateRenderer';
@@ -83,13 +83,6 @@ export const TemplatePreviewModal: React.FC<{
                 <span className="font-bold text-slate-900 flex items-center gap-1">
                   <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
                   {template.rating} / 5.0
-                </span>
-              </div>
-              <div className="flex items-center justify-between py-1 border-b border-slate-200">
-                <span className="text-slate-500">Active Users</span>
-                <span className="font-bold text-slate-900 flex items-center gap-1">
-                  <Users className="w-3.5 h-3.5 text-slate-500" />
-                  {template.usageCount}
                 </span>
               </div>
               <div className="flex items-center justify-between py-1 border-b border-slate-200">

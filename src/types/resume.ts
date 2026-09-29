@@ -197,7 +197,7 @@ export interface TemplateDefinition {
   description: string;
   category: string;
   rating: number;
-  usageCount: string;
+  usageCount?: string;
   atsFriendly: boolean;
   isPro: boolean;
   badge?: string;

@@ -79,12 +79,12 @@ export const analyzeResumeATS = (resume: ResumeData): ATSAnalysisResult => {
     passedChecks.push('Measurable quantitative achievements (% metrics and numbers) found');
   } else {
     score -= 8;
-    warningChecks.push('Lacks measurable impact metrics (percentages, throughput, or user counts)');
+    warningChecks.push('Lacks measurable impact metrics (percentages, throughput, or efficiency gains)');
     suggestions.push({
       id: 'sug-metric',
       section: 'Experience',
       title: 'Add Quantifiable Results',
-      description: 'Replace generic task statements with metrics like "reduced latency by 40%" or "served 5,000+ users".',
+      description: 'Replace generic task statements with metrics like "reduced latency by 40%" or "improved throughput by 65%".',
       sampleFix: 'Accelerated document processing ingestion throughput by 65% using asynchronous Celery workers.',
     });
   }

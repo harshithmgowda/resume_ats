@@ -13,7 +13,6 @@ import {
   HelpCircle,
   FileText,
   Briefcase,
-  Users,
 } from 'lucide-react';
 import { useResume } from '../../context/ResumeContext';
 import { templatesList } from '../../data/templates';

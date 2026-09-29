@@ -23,6 +23,7 @@ import {
 import { useResume } from '../../context/ResumeContext';
 import { SkillCategory, LanguageProficiency } from '../../types/resume';
 import { AIHelper, AISuggestion } from '../../utils/aiAssistant';
+import { LiveAIRaterBox } from './LiveAIRaterBox';
 
 export const SectionForm: React.FC = () => {
   const {
@@ -193,6 +194,9 @@ export const SectionForm: React.FC = () => {
 
       {/* Scrollable Form Body */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        {/* Live Input AI Rating & Coach Box */}
+        <LiveAIRaterBox />
+
         {/* SECTION 1: PERSONAL INFORMATION */}
         <div className="bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
           <button

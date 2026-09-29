@@ -26,6 +26,36 @@ export async function callNvidiaAi(
   messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
   options?: { temperature?: number; max_tokens?: number; preferredModel?: string }
 ): Promise<{ content: string; modelUsed: string }> {
+  // 1. Try server proxy endpoint /api/chat first (bypasses browser CORS on Vercel & local Vite)
+  try {
+    const proxyRes = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messages,
+        model: options?.preferredModel || 'meta/llama-3.2-11b-vision-instruct',
+        temperature: options?.temperature ?? 0.2,
+        max_tokens: options?.max_tokens ?? 2500,
+      }),
+    });
+
+    if (proxyRes.ok) {
+      const data = await proxyRes.json();
+      const content = data.choices?.[0]?.message?.content || '';
+      if (content.trim()) {
+        return {
+          content,
+          modelUsed: data.modelUsed || 'NVIDIA NIM',
+        };
+      }
+    }
+  } catch (proxyError: any) {
+    console.warn('Proxy /api/chat failed, attempting direct endpoint fallback:', proxyError.message);
+  }
+
+  // 2. Direct fallback
   const apiKey = getNvidiaApiKey();
   const modelsToTry = options?.preferredModel
     ? [options.preferredModel, ...SUPPORTED_MODELS.filter((m) => m !== options.preferredModel)]

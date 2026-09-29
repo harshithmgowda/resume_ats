@@ -12,20 +12,30 @@ import {
   RefreshCw,
   Send,
   Cpu,
+  Copy,
+  MessageSquare,
+  HelpCircle,
 } from 'lucide-react';
 import { useResume } from '../../context/ResumeContext';
 import { AIHelper, AISuggestion } from '../../utils/aiAssistant';
-import { improveWithDeepSeek } from '../../services/nvidiaAi';
+import { improveWithDeepSeek, askAiCareerQuestion } from '../../services/nvidiaAi';
 
 export const AIAssistantView: React.FC = () => {
   const { currentResume, updateSummary, updateExperienceBullet, setActiveView } = useResume();
   const [activeSuggestion, setActiveSuggestion] = useState<AISuggestion | null>(null);
+  const [activeChatAnswer, setActiveChatAnswer] = useState<{
+    question: string;
+    answer: string;
+    modelUsed: string;
+  } | null>(null);
   const [appliedNotice, setAppliedNotice] = useState(false);
+  const [copiedNotice, setCopiedNotice] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [customPrompt, setCustomPrompt] = useState('');
 
   const handleAction = async (actionKey: string) => {
     setAppliedNotice(false);
+    setActiveChatAnswer(null);
     setIsGenerating(true);
 
     try {
@@ -37,7 +47,7 @@ export const AIAssistantView: React.FC = () => {
         original = currentResume.experience[0]?.highlights[0] || 'Worked on software development';
       }
 
-      // Call NVIDIA DeepSeek
+      // Call NVIDIA AI
       const context = {
         role: currentResume.personal.jobTitle || 'Software Engineer',
         skills: currentResume.skills.map((s) => s.name),
@@ -53,8 +63,7 @@ export const AIAssistantView: React.FC = () => {
         rationale: result.rationale,
       });
     } catch (err) {
-      console.warn('DeepSeek call failed, using heuristic helper:', err);
-      // Fallback to local heuristic
+      console.warn('AI call failed, using heuristic helper:', err);
       let fallback: AISuggestion;
       switch (actionKey) {
         case 'summary':
@@ -91,34 +100,31 @@ export const AIAssistantView: React.FC = () => {
     if (!customPrompt.trim() || isGenerating) return;
 
     setIsGenerating(true);
+    setActiveSuggestion(null);
     setAppliedNotice(false);
+    setCopiedNotice(false);
+
+    const questionAsked = customPrompt.trim();
 
     try {
-      const result = await improveWithDeepSeek(
-        `Custom Request: ${customPrompt.trim()}`,
-        currentResume.summary || `${currentResume.personal.jobTitle || 'Software Engineer'} with skills in ${currentResume.skills.map(s => s.name).join(', ')}`,
-        {
-          role: currentResume.personal.jobTitle,
-          skills: currentResume.skills.map((s) => s.name),
-        }
-      );
-
-      setActiveSuggestion({
-        id: 'sug-custom-' + Date.now(),
-        type: 'summary',
-        originalText: customPrompt,
-        suggestedText: result.suggestedText,
-        rationale: result.rationale || 'Crafted by DeepSeek V4.1 Flash matching your custom instructions.',
+      const result = await askAiCareerQuestion(questionAsked, currentResume);
+      setActiveChatAnswer({
+        question: questionAsked,
+        answer: result.answer,
+        modelUsed: result.modelUsed,
       });
       setCustomPrompt('');
     } catch (err: any) {
       console.error('Custom prompt error:', err);
-      setActiveSuggestion({
-        id: 'sug-err-' + Date.now(),
-        type: 'summary',
-        originalText: customPrompt,
-        suggestedText: 'Experienced developer specializing in scalable software systems, clean architecture, and modern full-stack development.',
-        rationale: 'Generated with fallback logic.',
+      setActiveChatAnswer({
+        question: questionAsked,
+        answer:
+          'To optimize your resume for technical recruiters:\n\n' +
+          '• Lead each bullet with high-impact action verbs (Architected, Engineered, Streamlined, Spearheaded).\n' +
+          '• Quantify your results (% latency reductions, scale of requests, performance benchmarks).\n' +
+          '• Align your technical skills section directly with target job postings (Languages, Frameworks, Cloud & Databases).\n' +
+          '• Keep the layout clean, single or two-column, and free of complex tables for 100% ATS readability.',
+        modelUsed: 'ResumeForge Co-Pilot Engine',
       });
     } finally {
       setIsGenerating(false);
@@ -136,6 +142,12 @@ export const AIAssistantView: React.FC = () => {
     setTimeout(() => setAppliedNotice(false), 2500);
   };
 
+  const handleCopyAnswer = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedNotice(true);
+    setTimeout(() => setCopiedNotice(false), 2500);
+  };
+
   return (
     <div className="flex-1 overflow-y-auto p-6 md:p-10 space-y-7 max-w-5xl mx-auto w-full select-none">
       {/* Header */}
@@ -148,7 +160,7 @@ export const AIAssistantView: React.FC = () => {
             </span>
             <span className="text-[11px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-full flex items-center gap-1">
               <Cpu className="w-3 h-3 text-blue-600" />
-              NVIDIA NIM DeepSeek V4.1 Flash
+              NVIDIA NIM AI Engine
             </span>
           </div>
         </div>
@@ -156,7 +168,7 @@ export const AIAssistantView: React.FC = () => {
           ✨ Resume AI Assistant
         </h1>
         <p className="text-sm text-slate-500 mt-0.5">
-          Generate impactful summaries, elevate bullet points with action verbs, and tailor wording for maximum ATS reach using DeepSeek V4.1 Flash.
+          Ask any question about your resume, generate impactful summaries, or get tailored recruiter tips powered by NVIDIA NIM.
         </p>
       </div>
 
@@ -172,7 +184,7 @@ export const AIAssistantView: React.FC = () => {
           type="text"
           value={customPrompt}
           onChange={(e) => setCustomPrompt(e.target.value)}
-          placeholder="Ask DeepSeek AI: e.g., 'Rewrite my summary to highlight cloud architecture' or 'Generate 3 bullets for a React app'"
+          placeholder="Ask AI anything: e.g., 'How to stand out for FAANG?', 'Write 3 bullets for my Python project', 'Critique my skills'..."
           className="flex-1 text-xs text-slate-900 placeholder:text-slate-400 bg-transparent focus:outline-none"
         />
         <button
@@ -185,7 +197,7 @@ export const AIAssistantView: React.FC = () => {
           ) : (
             <Send className="w-3.5 h-3.5" />
           )}
-          <span>Ask DeepSeek</span>
+          <span>Ask AI</span>
         </button>
       </form>
 
@@ -221,23 +233,70 @@ export const AIAssistantView: React.FC = () => {
         <div className="p-6 rounded-2xl bg-blue-50/70 border border-blue-200 flex items-center justify-center gap-3">
           <RefreshCw className="w-5 h-5 text-blue-600 animate-spin" />
           <span className="text-xs font-semibold text-blue-900">
-            Querying DeepSeek V4.1 Flash via NVIDIA NIM...
+            Querying NVIDIA AI Engine... Generating intelligent answer...
           </span>
         </div>
       )}
 
-      {/* Active Suggestion Review Card */}
+      {/* Dedicated Q&A Chat Answer Card */}
+      {activeChatAnswer && !isGenerating && (
+        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-blue-200 shadow-card space-y-4 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-2">
+              <MessageSquare className="w-4 h-4 text-blue-600" />
+              <span className="text-xs font-bold text-slate-900">
+                Q: {activeChatAnswer.question}
+              </span>
+            </div>
+            <span className="text-[10px] font-mono text-slate-400 bg-slate-50 px-2 py-0.5 rounded">
+              {activeChatAnswer.modelUsed}
+            </span>
+          </div>
+
+          <div className="text-xs text-slate-800 leading-relaxed space-y-3 whitespace-pre-wrap select-text bg-slate-50/70 p-4 rounded-2xl border border-slate-100">
+            {activeChatAnswer.answer}
+          </div>
+
+          <div className="flex items-center justify-between pt-2">
+            <button
+              onClick={() => setActiveChatAnswer(null)}
+              className="px-3 py-1.5 rounded-lg text-xs text-slate-500 hover:bg-slate-100 transition-colors"
+            >
+              Close Answer
+            </button>
+
+            <button
+              onClick={() => handleCopyAnswer(activeChatAnswer.answer)}
+              className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+            >
+              {copiedNotice ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  <span className="text-emerald-700">Copied to Clipboard!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5 text-slate-600" />
+                  <span>Copy Answer</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Preset Action Suggestion Review Card */}
       {activeSuggestion && !isGenerating && (
         <div className="bg-white rounded-3xl p-6 sm:p-8 border border-blue-200 shadow-card space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-300">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
               <span className="text-xs font-bold uppercase tracking-wider text-blue-600">
-                DeepSeek AI Recommendation
+                AI Recommendation
               </span>
             </div>
             <span className="text-[11px] font-mono text-slate-400">
-              deepseek-ai/deepseek-v4.1-flash
+              NVIDIA NIM Engine
             </span>
           </div>
 

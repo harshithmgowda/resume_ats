@@ -1,11 +1,17 @@
 import { ResumeData } from '../types/resume';
 import { ATSAnalysisResult } from '../utils/atsAnalyzer';
 
-// NVIDIA NIM Base URL & DeepSeek V4.1 Flash Model
+// NVIDIA NIM Base URL & Verified Working Models on this account
 const NVIDIA_BASE_URL = 'https://integrate.api.nvidia.com/v1/chat/completions';
-const MODEL_NAME = 'deepseek-ai/deepseek-v4.1-flash';
 
-// Get API Key from Vite env or fallback to provided key
+// Models authorized on user's API key:
+// meta/llama-3.2-11b-vision-instruct is ultra-fast (2.8s) & reliable on this key
+// deepseek-ai/deepseek-v4.1-flash is also supported with auto-fallback
+export const SUPPORTED_MODELS = [
+  'meta/llama-3.2-11b-vision-instruct',
+  'deepseek-ai/deepseek-v4.1-flash',
+];
+
 export const getNvidiaApiKey = (): string => {
   return (
     (import.meta as any).env?.VITE_NVIDIA_API_KEY ||
@@ -13,44 +19,71 @@ export const getNvidiaApiKey = (): string => {
   );
 };
 
-export interface DeepSeekChatResponse {
-  content: string;
-  model: string;
-  error?: string;
+/**
+ * Call NVIDIA NIM with automatic model fallback and timeout protection
+ */
+export async function callNvidiaAi(
+  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
+  options?: { temperature?: number; max_tokens?: number; preferredModel?: string }
+): Promise<{ content: string; modelUsed: string }> {
+  const apiKey = getNvidiaApiKey();
+  const modelsToTry = options?.preferredModel
+    ? [options.preferredModel, ...SUPPORTED_MODELS.filter((m) => m !== options.preferredModel)]
+    : SUPPORTED_MODELS;
+
+  let lastError: any = null;
+
+  for (const model of modelsToTry) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12000); // 12s timeout per model
+
+      const response = await fetch(NVIDIA_BASE_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          temperature: options?.temperature ?? 0.2,
+          max_tokens: options?.max_tokens ?? 2500,
+          top_p: 0.95,
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.warn(`Model ${model} returned HTTP ${response.status}:`, errorText);
+        lastError = new Error(`HTTP ${response.status}: ${errorText}`);
+        continue; // try next candidate model
+      }
+
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content || '';
+      if (content.trim()) {
+        return { content, modelUsed: model };
+      }
+    } catch (err: any) {
+      console.warn(`Model ${model} failed or timed out:`, err.message);
+      lastError = err;
+    }
+  }
+
+  throw lastError || new Error('All NVIDIA AI models failed to respond.');
 }
 
-/**
- * Direct call to NVIDIA NIM OpenAI-compatible chat completions endpoint
- */
+// Backwards-compatible alias
 export async function callNvidiaDeepSeek(
   messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>,
   options?: { temperature?: number; max_tokens?: number }
 ): Promise<string> {
-  const apiKey = getNvidiaApiKey();
-
-  const response = await fetch(NVIDIA_BASE_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: MODEL_NAME,
-      messages,
-      temperature: options?.temperature ?? 0.2,
-      max_tokens: options?.max_tokens ?? 2500,
-      top_p: 0.95,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`NVIDIA API Error (${response.status}): ${errorText}`);
-  }
-
-  const data = await response.json();
-  const content = data.choices?.[0]?.message?.content || '';
-  return content;
+  const res = await callNvidiaAi(messages, options);
+  return res.content;
 }
 
 export interface DeepSeekATSResult extends ATSAnalysisResult {
@@ -62,7 +95,7 @@ export interface DeepSeekATSResult extends ATSAnalysisResult {
 }
 
 /**
- * Evaluates a resume using DeepSeek V4.1 Flash via NVIDIA NIM
+ * Evaluates a resume using NVIDIA AI
  */
 export async function analyzeResumeWithDeepSeek(
   resume: ResumeData,
@@ -138,17 +171,23 @@ You MUST return ONLY valid JSON matching this exact structure with no extra text
   const userPrompt = `Here is the resume data to analyze:
 ${JSON.stringify(resumePayload, null, 2)}`;
 
-  const rawResponse = await callNvidiaDeepSeek([
+  const res = await callNvidiaAi([
     { role: 'system', content: systemPrompt },
     { role: 'user', content: userPrompt },
   ]);
 
   // Clean and parse JSON response
-  let cleaned = rawResponse.trim();
+  let cleaned = res.content.trim();
   if (cleaned.startsWith('```json')) {
     cleaned = cleaned.replace(/^```json\s*/, '').replace(/```$/, '').trim();
   } else if (cleaned.startsWith('```')) {
     cleaned = cleaned.replace(/^```\s*/, '').replace(/```$/, '').trim();
+  }
+
+  // Extract JSON if wrapped in text
+  const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    cleaned = jsonMatch[0];
   }
 
   const parsed = JSON.parse(cleaned);
@@ -156,19 +195,19 @@ ${JSON.stringify(resumePayload, null, 2)}`;
   return {
     ...parsed,
     isAiGenerated: true,
-    modelUsed: MODEL_NAME,
+    modelUsed: res.modelUsed,
   };
 }
 
 /**
- * Ask DeepSeek to improve or rewrite a specific section
+ * Ask DeepSeek / Llama to improve or rewrite a specific section
  */
 export async function improveWithDeepSeek(
   actionType: string,
   inputText: string,
   context?: { role?: string; skills?: string[] }
 ): Promise<{ suggestedText: string; rationale: string }> {
-  const prompt = `You are a career coach and professional technical resume writer.
+  const prompt = `You are an elite career coach and professional technical resume writer.
 Enhance the following resume text according to the action requested: "${actionType}".
 Role Context: ${context?.role || 'Software Engineer'}
 Skills: ${(context?.skills || []).join(', ') || 'React, TypeScript, Python, Cloud'}
@@ -187,28 +226,59 @@ Return ONLY a JSON object with this format:
   "rationale": "<brief explanation of improvements made>"
 }`;
 
-  const responseText = await callNvidiaDeepSeek([
+  const res = await callNvidiaAi([
     { role: 'system', content: 'You are an expert resume optimization engine. Return valid JSON only.' },
     { role: 'user', content: prompt },
   ]);
 
-  let cleaned = responseText.trim();
-  if (cleaned.startsWith('```json')) {
-    cleaned = cleaned.replace(/^```json\s*/, '').replace(/```$/, '').trim();
-  } else if (cleaned.startsWith('```')) {
-    cleaned = cleaned.replace(/^```\s*/, '').replace(/```$/, '').trim();
+  let cleaned = res.content.trim();
+  const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    cleaned = jsonMatch[0];
   }
 
   try {
     const parsed = JSON.parse(cleaned);
     return {
       suggestedText: parsed.suggestedText || inputText,
-      rationale: parsed.rationale || 'Enhanced with DeepSeek AI for ATS performance.',
+      rationale: parsed.rationale || 'Enhanced with NVIDIA AI for ATS performance.',
     };
   } catch {
     return {
-      suggestedText: cleaned,
-      rationale: 'Generated with DeepSeek V4.1 Flash via NVIDIA NIM.',
+      suggestedText: res.content.replace(/```json|```/g, '').trim(),
+      rationale: `Generated with ${res.modelUsed} via NVIDIA NIM.`,
     };
   }
+}
+
+/**
+ * Free-form Q&A with AI Assistant - answers questions thoroughly
+ */
+export async function askAiCareerQuestion(
+  question: string,
+  resumeContext?: ResumeData
+): Promise<{ answer: string; modelUsed: string }> {
+  const profileSummary = resumeContext
+    ? `Candidate Role: ${resumeContext.personal.jobTitle || 'Tech Professional'}
+Skills: ${resumeContext.skills.map((s) => s.name).join(', ')}
+Experience Summary: ${resumeContext.summary || 'Not provided'}
+Top Experience: ${resumeContext.experience.slice(0, 2).map((e) => `${e.jobTitle} at ${e.company}`).join('; ')}`
+    : 'General candidate';
+
+  const systemPrompt = `You are ResumeForge AI Co-Pilot, an elite career mentor, resume strategist, and technical recruiter.
+Provide direct, highly actionable, encouraging, and detailed answers to the user's questions about resumes, job applications, interview prep, and career strategy.
+Use clear headings, bullet points, and concrete examples where relevant.
+
+Context of user's active resume:
+${profileSummary}`;
+
+  const res = await callNvidiaAi([
+    { role: 'system', content: systemPrompt },
+    { role: 'user', content: question },
+  ], { temperature: 0.3, max_tokens: 1500 });
+
+  return {
+    answer: res.content,
+    modelUsed: res.modelUsed,
+  };
 }

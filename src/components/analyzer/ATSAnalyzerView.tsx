@@ -213,9 +213,11 @@ export const ATSAnalyzerView: React.FC = () => {
                 className={`transition-all duration-1000 ease-out ${
                   activeAnalysis.score >= 85
                     ? 'text-blue-600'
-                    : activeAnalysis.score >= 70
+                    : activeAnalysis.score >= 65
                     ? 'text-indigo-600'
-                    : 'text-amber-500'
+                    : activeAnalysis.score > 0
+                    ? 'text-amber-500'
+                    : 'text-slate-300'
                 }`}
                 strokeWidth="14"
                 strokeDasharray={circumference}
@@ -236,12 +238,48 @@ export const ATSAnalyzerView: React.FC = () => {
           </div>
 
           <div>
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 text-xs font-bold mb-2">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Grade {activeAnalysis.grade} • Highly Scannable</span>
-            </div>
+            {activeAnalysis.score === 0 ? (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-700 text-xs font-bold mb-2">
+                <ShieldCheck className="w-3.5 h-3.5 text-slate-500" />
+                <span>Unrated • Awaiting Content</span>
+              </div>
+            ) : (
+              <div
+                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold mb-2 ${
+                  activeAnalysis.score >= 80
+                    ? 'bg-emerald-50 text-emerald-800'
+                    : activeAnalysis.score >= 60
+                    ? 'bg-blue-50 text-blue-800'
+                    : 'bg-amber-50 text-amber-800'
+                }`}
+              >
+                <ShieldCheck
+                  className={`w-3.5 h-3.5 ${
+                    activeAnalysis.score >= 80
+                      ? 'text-emerald-600'
+                      : activeAnalysis.score >= 60
+                      ? 'text-blue-600'
+                      : 'text-amber-600'
+                  }`}
+                />
+                <span>
+                  Grade {activeAnalysis.grade} •{' '}
+                  {activeAnalysis.score >= 80
+                    ? 'Highly Scannable'
+                    : activeAnalysis.score >= 60
+                    ? 'Competitive'
+                    : 'Needs Polish'}
+                </span>
+              </div>
+            )}
             <h3 className="text-lg font-bold text-slate-900">
-              {activeAnalysis.score >= 85 ? 'Strong Interview Readiness' : 'Optimization Recommended'}
+              {activeAnalysis.score === 0
+                ? 'Ready to Scan Your Resume'
+                : activeAnalysis.score >= 85
+                ? 'Strong Interview Readiness'
+                : activeAnalysis.score >= 65
+                ? 'Competitive Foundation'
+                : 'Optimization Recommended'}
             </h3>
             <p className="text-xs text-slate-600 max-w-md mt-1 leading-relaxed">
               {activeAnalysis.summary}
@@ -347,12 +385,18 @@ export const ATSAnalyzerView: React.FC = () => {
           </div>
 
           <div className="space-y-2">
-            {activeAnalysis.passedChecks.map((check, idx) => (
-              <div key={idx} className="flex items-start gap-2 text-xs text-slate-700">
-                <span className="text-emerald-600 font-bold shrink-0">✓</span>
-                <span>{check}</span>
-              </div>
-            ))}
+            {activeAnalysis.passedChecks.length > 0 ? (
+              activeAnalysis.passedChecks.map((check, idx) => (
+                <div key={idx} className="flex items-start gap-2 text-xs text-slate-700">
+                  <span className="text-emerald-600 font-bold shrink-0">✓</span>
+                  <span>{check}</span>
+                </div>
+              ))
+            ) : (
+              <p className="text-xs text-slate-400 italic py-2">
+                No verifications passed yet. Fill in contact info, skills, and experience in the builder.
+              </p>
+            )}
           </div>
         </div>
 

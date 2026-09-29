@@ -119,8 +119,9 @@ export const LandingPage: React.FC = () => {
               <span className="ml-2 font-mono text-[11px]">resumeforge.app/preview</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-emerald-700 font-bold flex items-center gap-1">
-                <ShieldCheck className="w-3.5 h-3.5" /> 87% ATS Score
+              <span className="text-blue-700 font-bold flex items-center gap-1">
+                <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+                {currentResume.atsScore && currentResume.atsScore > 0 ? `${currentResume.atsScore}% ATS Score` : 'Live ATS Scanner'}
               </span>
             </div>
           </div>

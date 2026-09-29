@@ -137,8 +137,8 @@ export const Dashboard: React.FC<{
 
                   {/* ATS Badge */}
                   <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-xs px-2 py-0.5 rounded-lg border border-slate-200 text-[10px] font-bold text-slate-800 flex items-center gap-1 shadow-2xs">
-                    <ShieldCheck className="w-3 h-3 text-emerald-600" />
-                    <span>{resume.atsScore || 87}% ATS</span>
+                    <ShieldCheck className={`w-3 h-3 ${resume.atsScore && resume.atsScore > 0 ? 'text-emerald-600' : 'text-slate-400'}`} />
+                    <span>{resume.atsScore && resume.atsScore > 0 ? `${resume.atsScore}% ATS` : 'Not Scanned'}</span>
                   </div>
                 </div>
 

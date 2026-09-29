@@ -5,7 +5,7 @@ export const initialResumeData: ResumeData = {
   id: 'resume-1',
   name: 'Untitled Resume',
   updatedAt: 'Just now',
-  atsScore: 70,
+  atsScore: 0,
   personal: {
     fullName: '',
     jobTitle: '',
@@ -41,7 +41,7 @@ export const sampleResumeData: ResumeData = {
   id: 'sample-resume',
   name: 'Sample Resume',
   updatedAt: 'Just now',
-  atsScore: 88,
+  atsScore: 0,
   personal: {
     fullName: 'Jane Doe',
     jobTitle: 'Software Engineer',

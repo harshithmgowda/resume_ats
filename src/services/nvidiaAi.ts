@@ -131,6 +131,80 @@ export async function analyzeResumeWithDeepSeek(
   resume: ResumeData,
   targetJobDescription?: string
 ): Promise<DeepSeekATSResult> {
+  const isResumeEmpty =
+    !resume.personal?.fullName?.trim() &&
+    !resume.summary?.trim() &&
+    (resume.experience?.length || 0) === 0 &&
+    (resume.projects?.length || 0) === 0 &&
+    (resume.skills?.length || 0) === 0;
+
+  if (isResumeEmpty) {
+    return {
+      score: 0,
+      grade: 'Unrated',
+      summary:
+        'Your resume is currently blank. Start adding your contact information, summary, skills, and work experience to calculate your live ATS compatibility score.',
+      categories: [
+        {
+          name: 'Contact & Links',
+          score: 0,
+          weight: '20%',
+          status: 'error',
+          feedback: 'No contact information provided yet.',
+        },
+        {
+          name: 'Keywords & Skills',
+          score: 0,
+          weight: '25%',
+          status: 'error',
+          feedback: 'No technical skills or keywords detected.',
+        },
+        {
+          name: 'Experience Impact',
+          score: 0,
+          weight: '30%',
+          status: 'error',
+          feedback: 'No work experience or projects added.',
+        },
+        {
+          name: 'Professional Summary',
+          score: 0,
+          weight: '15%',
+          status: 'error',
+          feedback: 'No executive summary provided.',
+        },
+        {
+          name: 'Education & Credentials',
+          score: 0,
+          weight: '10%',
+          status: 'warning',
+          feedback: 'No education credentials listed.',
+        },
+      ],
+      passedChecks: [],
+      warningChecks: [
+        'Add your full name, email, and phone number',
+        'List target technical skills and frameworks',
+        'Add work experience or projects with quantifiable achievements',
+        'Write a concise 2-3 sentence professional summary',
+      ],
+      suggestions: [
+        {
+          id: 'sug-empty-1',
+          section: 'Summary',
+          title: 'Add Executive Summary',
+          description: 'A 2-3 sentence overview gives ATS and recruiters context on your engineering level.',
+          sampleFix: 'Software Engineer specializing in modern web architecture, frontend performance, and scalable cloud APIs.',
+        },
+      ],
+      isAiGenerated: false,
+      modelUsed: 'ResumeForge Live Input Evaluator',
+      matchedKeywords: [],
+      missingKeywords: [],
+      atsReadabilityNotes: 'Start adding content in the builder to generate custom ATS readability suggestions.',
+    };
+  }
+
   const systemPrompt = `You are an elite Applicant Tracking System (ATS) AI engine, technical recruiter, and hiring manager for top tier software and technology companies.
 You evaluate resumes strictly as modern enterprise scanners (Workday, Taleo, Greenhouse, Lever) do.
 
@@ -142,18 +216,18 @@ ${targetJobDescription}
 
 You MUST return ONLY valid JSON matching this exact structure with no extra text or markdown formatting outside the JSON:
 {
-  "score": <number between 40 and 99 representing overall ATS match score>,
-  "grade": <"A+" | "A" | "B+" | "B" | "C">,
+  "score": <number between 0 and 100 representing overall ATS match score based strictly on actual content present, 0 if empty or placeholder>,
+  "grade": <"A+" | "A" | "B+" | "B" | "C" | "Unrated">,
   "summary": <concise 2-sentence summary of the resume's ATS readiness and impact>,
   "categories": [
-    { "name": "Contact & Links", "score": <number 0-100>, "weight": "15%", "status": <"good" | "warning" | "error">, "feedback": <brief feedback> },
-    { "name": "Keywords & Skills", "score": <number 0-100>, "weight": "30%", "status": <"good" | "warning" | "error">, "feedback": <brief feedback> },
+    { "name": "Contact & Links", "score": <number 0-100>, "weight": "20%", "status": <"good" | "warning" | "error">, "feedback": <brief feedback> },
+    { "name": "Keywords & Skills", "score": <number 0-100>, "weight": "25%", "status": <"good" | "warning" | "error">, "feedback": <brief feedback> },
     { "name": "Experience Impact", "score": <number 0-100>, "weight": "30%", "status": <"good" | "warning" | "error">, "feedback": <brief feedback> },
-    { "name": "Formatting & Layout", "score": <number 0-100>, "weight": "15%", "status": <"good" | "warning" | "error">, "feedback": <brief feedback> },
-    { "name": "Readability & Grammar", "score": <number 0-100>, "weight": "10%", "status": <"good" | "warning" | "error">, "feedback": <brief feedback> }
+    { "name": "Professional Summary", "score": <number 0-100>, "weight": "15%", "status": <"good" | "warning" | "error">, "feedback": <brief feedback> },
+    { "name": "Education & Credentials", "score": <number 0-100>, "weight": "10%", "status": <"good" | "warning" | "error">, "feedback": <brief feedback> }
   ],
-  "passedChecks": [<array of 3-5 specific passed points (e.g. "Github & LinkedIn links detected", "Quantified achievement in experience")>],
-  "warningChecks": [<array of 2-4 critical ATS warnings or missing components>],
+  "passedChecks": [<array of specific passed points (e.g. "Github & LinkedIn links detected", "Quantified achievement in experience")>],
+  "warningChecks": [<array of critical ATS warnings or missing components>],
   "suggestions": [
     {
       "id": "sug-1",

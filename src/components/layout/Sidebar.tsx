@@ -44,7 +44,7 @@ export const Sidebar: React.FC<{
     { id: 'editor', label: 'Resume Builder', icon: <Layers className="w-4 h-4" />, badge: 'Active' },
     { id: 'templates', label: 'Templates', icon: <Palette className="w-4 h-4" />, badge: '12' },
     { id: 'aiAssistant', label: 'AI Assistant', icon: <Sparkles className="w-4 h-4 text-amber-500" /> },
-    { id: 'analyzer', label: 'Resume Analyzer', icon: <BarChart3 className="w-4 h-4" />, badge: '87%' },
+    { id: 'analyzer', label: 'Resume Analyzer', icon: <BarChart3 className="w-4 h-4" /> },
     { id: 'publicView', label: 'Public Web Resume', icon: <ExternalLink className="w-4 h-4" /> },
     { id: 'landingPage', label: 'Product Tour', icon: <Home className="w-4 h-4" /> },
   ];

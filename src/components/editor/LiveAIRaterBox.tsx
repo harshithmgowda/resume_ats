@@ -5,8 +5,6 @@ import {
   CheckCircle2,
   AlertTriangle,
   RefreshCw,
-  ArrowRight,
-  TrendingUp,
   Cpu,
   ChevronDown,
   ChevronUp,
@@ -15,6 +13,7 @@ import {
 } from 'lucide-react';
 import { useResume } from '../../context/ResumeContext';
 import { analyzeResumeWithDeepSeek, DeepSeekATSResult } from '../../services/nvidiaAi';
+import { analyzeResumeATS } from '../../utils/atsAnalyzer';
 
 export const LiveAIRaterBox: React.FC = () => {
   const { currentResume, updateSummary, updateExperienceBullet } = useResume();
@@ -23,48 +22,37 @@ export const LiveAIRaterBox: React.FC = () => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [appliedNotice, setAppliedNotice] = useState<string | null>(null);
 
+  // Baseline input-driven ATS calculation
+  const baseAnalysis = useMemo(() => {
+    return analyzeResumeATS(currentResume);
+  }, [currentResume]);
+
   // Live input heuristics based strictly on what user has typed so far
   const liveStats = useMemo(() => {
-    const hasName = Boolean(currentResume.personal.fullName?.trim());
-    const hasTitle = Boolean(currentResume.personal.jobTitle?.trim());
+    const hasName = Boolean(currentResume.personal?.fullName?.trim());
+    const hasTitle = Boolean(currentResume.personal?.jobTitle?.trim());
     const hasContact = Boolean(
-      currentResume.personal.email?.trim() && currentResume.personal.phone?.trim()
+      currentResume.personal?.email?.trim() && currentResume.personal?.phone?.trim()
     );
     const summaryLen = currentResume.summary?.trim().length || 0;
-    const skillsCount = currentResume.skills.length;
-    const expCount = currentResume.experience.length;
-    const projCount = currentResume.projects.length;
+    const skillsCount = currentResume.skills?.length || 0;
+    const expCount = currentResume.experience?.length || 0;
+    const projCount = currentResume.projects?.length || 0;
 
     // Check for metrics in bullets
     const allBullets = [
-      ...currentResume.experience.flatMap((e) => e.highlights),
-      ...currentResume.projects.flatMap((p) => p.highlights),
+      ...currentResume.experience.flatMap((e) => e.highlights || []),
+      ...currentResume.projects.flatMap((p) => p.highlights || []),
     ];
     const hasNumbers = allBullets.some((b) => /\d+%|\d+k|\b\d+\b/i.test(b));
-    const actionVerbs = ['Architected', 'Engineered', 'Optimized', 'Developed', 'Spearheaded', 'Deployed'];
+    const actionVerbs = ['Architected', 'Engineered', 'Optimized', 'Developed', 'Spearheaded', 'Deployed', 'Refactored', 'Built'];
     const hasVerbs = actionVerbs.some((v) =>
       allBullets.some((b) => b.toLowerCase().includes(v.toLowerCase()))
     );
 
-    // Calculate live score (0-100) strictly from user input
-    let score = 30;
-    if (hasName) score += 10;
-    if (hasTitle) score += 10;
-    if (hasContact) score += 10;
-    if (summaryLen >= 80) score += 12;
-    else if (summaryLen > 0) score += 5;
-    if (skillsCount >= 8) score += 12;
-    else if (skillsCount >= 4) score += 6;
-    if (expCount > 0 || projCount > 0) score += 10;
-    if (hasNumbers) score += 8;
-    if (hasVerbs) score += 8;
-
-    score = Math.min(98, score);
-    const grade = score >= 88 ? 'A+' : score >= 80 ? 'A' : score >= 70 ? 'B+' : score >= 60 ? 'B' : 'Needs Polish';
-
     return {
-      score,
-      grade,
+      score: baseAnalysis.score,
+      grade: baseAnalysis.grade,
       hasName,
       hasTitle,
       hasContact,
@@ -75,7 +63,7 @@ export const LiveAIRaterBox: React.FC = () => {
       hasNumbers,
       hasVerbs,
     };
-  }, [currentResume]);
+  }, [currentResume, baseAnalysis]);
 
   const handleRunAiAnalysis = async () => {
     setIsAnalyzing(true);
@@ -86,64 +74,9 @@ export const LiveAIRaterBox: React.FC = () => {
       setAiResult(result);
     } catch (err: any) {
       console.warn('Live AI analysis error:', err);
-      // Construct realistic input-based analysis
+      // Fallback cleanly to our input-driven analysis
       setAiResult({
-        score: liveStats.score,
-        grade: liveStats.grade as any,
-        summary: `Based on your active input as "${currentResume.personal.jobTitle || 'Tech Professional'}": ${
-          liveStats.skillsCount < 6
-            ? 'Add more specific programming languages and tools.'
-            : 'Good technical skill breadth.'
-        } ${!liveStats.hasNumbers ? 'Include percentages or quantitative metrics in your experience bullets.' : ''}`,
-        categories: [
-          {
-            name: 'Contact & Profile',
-            score: liveStats.hasContact ? 95 : 60,
-            weight: '15%',
-            status: liveStats.hasContact ? 'good' : 'warning',
-            feedback: liveStats.hasContact ? 'Complete contact details' : 'Add phone and email',
-          },
-          {
-            name: 'Skills & Keywords',
-            score: liveStats.skillsCount >= 8 ? 92 : 65,
-            weight: '30%',
-            status: liveStats.skillsCount >= 8 ? 'good' : 'warning',
-            feedback: `${liveStats.skillsCount} skills entered`,
-          },
-          {
-            name: 'Measurable Impact',
-            score: liveStats.hasNumbers ? 88 : 55,
-            weight: '30%',
-            status: liveStats.hasNumbers ? 'good' : 'warning',
-            feedback: liveStats.hasNumbers ? 'Quantifiable metrics found' : 'Missing % metrics and scale',
-          },
-          {
-            name: 'Section Structure',
-            score: 90,
-            weight: '25%',
-            status: 'good',
-            feedback: 'Standard ATS hierarchy',
-          },
-        ],
-        passedChecks: [
-          liveStats.hasName ? 'Candidate identity verified' : null,
-          liveStats.skillsCount >= 4 ? `${liveStats.skillsCount} technical skills listed` : null,
-          liveStats.summaryLen > 50 ? 'Professional summary provided' : null,
-        ].filter(Boolean) as string[],
-        warningChecks: [
-          !liveStats.hasNumbers ? 'Bullets lack quantitative results (% or user counts)' : null,
-          liveStats.skillsCount < 8 ? 'Recommend listing at least 8-10 target technologies' : null,
-          liveStats.summaryLen < 80 ? 'Expand executive summary with career focus' : null,
-        ].filter(Boolean) as string[],
-        suggestions: [
-          {
-            id: 'sug-live-1',
-            section: 'Summary',
-            title: 'Elevate Executive Summary',
-            description: 'Make summary concise and focused on your primary stack.',
-            sampleFix: `${currentResume.personal.jobTitle || 'Software Engineer'} with hands-on experience building scalable applications, designing robust APIs, and optimizing database performance.`,
-          },
-        ],
+        ...baseAnalysis,
         isAiGenerated: false,
         modelUsed: 'ResumeForge Live Input Evaluator',
       });
@@ -162,7 +95,10 @@ export const LiveAIRaterBox: React.FC = () => {
     setTimeout(() => setAppliedNotice(null), 3000);
   };
 
-  const activeScore = aiResult ? aiResult.score : liveStats.score;
+  const activeScore = aiResult ? aiResult.score : baseAnalysis.score;
+  const activeGrade = aiResult ? aiResult.grade : baseAnalysis.grade;
+  const activeSummary = aiResult ? aiResult.summary : baseAnalysis.summary;
+  const activeSuggestions = aiResult?.suggestions || baseAnalysis.suggestions;
 
   return (
     <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-4 text-white shadow-md border border-indigo-800/40 mb-4 transition-all">
@@ -199,10 +135,12 @@ export const LiveAIRaterBox: React.FC = () => {
                   ? 'bg-emerald-500/20 text-emerald-300'
                   : activeScore >= 65
                   ? 'bg-amber-500/20 text-amber-300'
-                  : 'bg-rose-500/20 text-rose-300'
+                  : activeScore > 0
+                  ? 'bg-rose-500/20 text-rose-300'
+                  : 'bg-slate-700/60 text-slate-300'
               }`}
             >
-              {liveStats.grade}
+              {activeGrade}
             </span>
           </div>
 
@@ -280,23 +218,23 @@ export const LiveAIRaterBox: React.FC = () => {
       {/* Expanded Detailed Feedback Box */}
       {isExpanded && (
         <div className="mt-3 pt-3 border-t border-white/10 space-y-3 animate-in fade-in duration-200">
-          {aiResult?.summary && (
+          {activeSummary && (
             <div className="p-3 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-200 leading-relaxed">
               <span className="font-semibold text-blue-300 block mb-0.5">
-                AI Coach Assessment:
+                {aiResult?.isAiGenerated ? 'NVIDIA DeepSeek AI Assessment:' : 'ATS Live Analysis:'}
               </span>
-              {aiResult.summary}
+              {activeSummary}
             </div>
           )}
 
           {/* AI Suggestions for their active text */}
-          {aiResult?.suggestions && aiResult.suggestions.length > 0 && (
+          {activeSuggestions && activeSuggestions.length > 0 && (
             <div className="space-y-2">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                Recommended Polish For Your Input:
+                Recommended Actions:
               </span>
 
-              {aiResult.suggestions.map((sug) => (
+              {activeSuggestions.map((sug) => (
                 <div
                   key={sug.id}
                   className="p-3 rounded-xl bg-indigo-950/60 border border-indigo-700/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs"

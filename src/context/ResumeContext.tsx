@@ -540,7 +540,7 @@ export const ResumeProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       id: newId,
       name: name || 'Untitled Resume',
       updatedAt: 'Just now',
-      atsScore: 85,
+      atsScore: 0,
     };
 
     setResumes((prev) => [newResume, ...prev]);
